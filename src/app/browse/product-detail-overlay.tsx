@@ -10,7 +10,7 @@ interface Props {
   onClose: () => void;
 }
 
-function FadeImage(props: React.ComponentProps<"img">) {
+function FadeImage({ onDrag: _, onDragStart: _ds, onDragEnd: _de, ...props }: React.ComponentProps<"img">) {
   const [loaded, setLoaded] = useState(false);
   return (
     // eslint-disable-next-line @next/next/no-img-element
