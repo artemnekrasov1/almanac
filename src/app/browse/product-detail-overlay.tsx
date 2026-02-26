@@ -10,12 +10,14 @@ interface Props {
   onClose: () => void;
 }
 
-function FadeImage({ onDrag: _, onDragStart: _ds, onDragEnd: _de, ...props }: React.ComponentProps<"img">) {
+function FadeImage({ src, alt, className }: { src?: string; alt?: string; className?: string }) {
   const [loaded, setLoaded] = useState(false);
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <motion.img
-      {...props}
+      src={src}
+      alt={alt}
+      className={className}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: loaded ? 1 : 0, y: loaded ? 0 : 8 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
