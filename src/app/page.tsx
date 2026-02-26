@@ -10,7 +10,7 @@ export default function Home() {
     >
       <div className="absolute inset-0 flex items-center justify-center px-[24px]">
         <div className="flex w-full max-w-[340px] flex-col items-center">
-          <img src="/brand/ALMANAC.svg" alt="ALMANAC" className="w-full" />
+          <img src="/brand/ALMANAC.svg" alt="Almanac" className="w-full" />
           <p className="mt-[32px] text-center font-mono text-[16px] text-black">
             Curated fashion sales from independent European boutiques
           </p>

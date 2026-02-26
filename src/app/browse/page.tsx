@@ -1,133 +1,84 @@
 import { supabaseServer } from "@/lib/supabase/server";
+import { ProductGrid } from "./product-grid";
+import { Sidebar } from "./sidebar";
+import { Badge } from "@/components/ui/badge";
+import { HeaderProvider, BrowseHeader, AnimatedContent } from "./browse-header";
+import { FilterProvider } from "./filter-context";
 
 export const dynamic = "force-dynamic";
 
-export default async function BrowsePage({
-  searchParams,
-}: {
-  searchParams: { cursor?: string };
-}) {
-  const PAGE_SIZE = 30;
+const PAGE_SIZE = 30;
 
-  // Parse cursor from search params
-  const cursor = searchParams.cursor;
-
-  let cursorLastSeenAt: string | null = null;
-  let cursorId: string | null = null;
-
-  if (cursor) {
-    try {
-      const parts = cursor.split("|");
-      if (parts.length === 2) {
-        cursorLastSeenAt = parts[0];
-        cursorId = parts[1];
-      }
-    } catch {
-      // Invalid cursor, treat as no cursor
-    }
-  }
-
-  // Build query
+export default async function BrowsePage() {
   const supabase = supabaseServer();
-  let query = supabase
+
+  const { data: brandRows } = await supabase
+    .from("products")
+    .select("brand")
+    .not("brand", "is", null)
+    .not("last_seen_at", "is", null);
+
+  const brands = [
+    ...new Set((brandRows ?? []).map((r: { brand: string }) => r.brand)),
+  ].sort((a, b) => a.localeCompare(b));
+
+  const { data: rows, error } = await supabase
     .from("products")
     .select(
-      "id,title,brand,price_sale,currency,discount_percent,image_url,product_url,last_seen_at"
+      "id,title,brand,price_sale,price_original,currency,discount_percent,image_url,product_url,sizes_raw,description,last_seen_at,shuffle_score,merchant_id,merchants(name)"
     )
     .not("last_seen_at", "is", null)
-    .order("last_seen_at", { ascending: false })
-    .order("id", { ascending: false })
+    .order("shuffle_score", { ascending: true })
+    .order("id", { ascending: true })
     .limit(PAGE_SIZE + 1);
-
-  // Apply cursor filter if present
-  if (cursorLastSeenAt && cursorId) {
-    query = query.or(
-      `last_seen_at.lt.${encodeURIComponent(cursorLastSeenAt)},and(last_seen_at.eq.${encodeURIComponent(cursorLastSeenAt)},id.lt.${encodeURIComponent(cursorId)})`
-    );
-  }
-
-  // Execute query
-  const { data: rows, error } = await query;
 
   if (error) {
     return (
       <main className="p-6">
-        <h1 className="text-2xl font-semibold">Browse</h1>
-        <pre className="mt-4 rounded bg-red-50 p-4 text-sm text-red-700">
-          {error.message}
-        </pre>
+        <p className="text-sm text-red-700">{error.message}</p>
       </main>
     );
   }
 
-  // Determine pagination
   const hasNextPage = (rows?.length ?? 0) > PAGE_SIZE;
-  const products = hasNextPage ? rows!.slice(0, PAGE_SIZE) : rows ?? [];
+  const rawProducts = hasNextPage ? rows!.slice(0, PAGE_SIZE) : rows ?? [];
+  const products = rawProducts.map(({ merchants, ...rest }: any) => ({
+    ...rest,
+    merchant_name: merchants?.name ?? null,
+  }));
 
-  // Compute next cursor
   let nextCursor: string | null = null;
   if (hasNextPage && products.length > 0) {
     const last = products[products.length - 1];
-    nextCursor = `${last.last_seen_at}|${last.id}`;
+    nextCursor = `${last.shuffle_score}|${last.id}`;
   }
 
   return (
-    <main className="p-6">
-      <h1 className="text-2xl font-semibold">Browse</h1>
-
-      <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        {products.map((p) => (
-          <div key={p.id} className="rounded-lg border p-3">
-            {p.image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={p.image_url}
-                alt={p.title ?? "Product image"}
-                className="h-56 w-full rounded-md object-cover"
-              />
-            ) : (
-              <div className="h-56 w-full rounded-md bg-gray-100" />
-            )}
-
-            <div className="mt-3 text-sm font-medium">{p.title}</div>
-
-            <div className="mt-1 text-xs text-gray-600">
-              {p.brand ?? "—"}
+    <FilterProvider>
+      <HeaderProvider>
+        <div className="relative">
+          <BrowseHeader
+            mobileLogo={<img src="/brand/Almanac.svg" alt="Almanac" className="h-[24px] w-auto" />}
+            badges={
+              <div className="flex items-center gap-[8px]">
+                <Badge variant="nav" className="nav-pill">Favorites</Badge>
+                <Badge variant="nav" className="nav-pill w-[32px] px-0 justify-center">€</Badge>
+              </div>
+            }
+          />
+          <AnimatedContent>
+            <div className="lg:flex lg:items-start lg:px-[32px] lg:gap-[32px]">
+              <Sidebar brands={brands} />
+              <main className="px-[24px] pb-[32px] lg:px-0 lg:flex-1 lg:min-w-0">
+                <ProductGrid
+                  initialProducts={products}
+                  initialNextCursor={nextCursor}
+                />
+              </main>
             </div>
-
-            <div className="mt-2 flex items-center justify-between text-sm">
-              <span>
-                {p.price_sale ?? "—"} {p.currency ?? "EUR"}
-              </span>
-              {typeof p.discount_percent === "number" ? (
-                <span className="rounded bg-gray-100 px-2 py-0.5 text-xs">
-                  -{p.discount_percent}%
-                </span>
-              ) : null}
-            </div>
-
-            {p.product_url ? (
-              <a
-                href={`/out/${p.id}`}
-                className="mt-3 inline-block text-sm underline"
-              >
-                View
-              </a>
-            ) : null}
-          </div>
-        ))}
-      </div>
-
-      {hasNextPage && nextCursor && (
-        <div className="mt-6 text-center">
-          <a
-            href={`/browse?cursor=${encodeURIComponent(nextCursor)}`}
-            className="inline-block rounded border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
-          >
-            Load more
-          </a>
+          </AnimatedContent>
         </div>
-      )}
-    </main>
+      </HeaderProvider>
+    </FilterProvider>
   );
 }

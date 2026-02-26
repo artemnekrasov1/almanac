@@ -1,16 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import { EB_Garamond } from "next/font/google";
+
+const ebGaramond = EB_Garamond({ subsets: ["latin"], style: ["normal", "italic"], variable: "--font-eb-garamond" });
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "ALMANAC",
@@ -28,7 +22,7 @@ export default function RootLayout({
         <meta name="awin-verification" content="Awin" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${GeistSans.variable} ${GeistMono.variable} ${ebGaramond.variable} antialiased`}
       >
         {children}
       </body>
