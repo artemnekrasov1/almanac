@@ -23,19 +23,22 @@ const HEADER_H = 72;
 const LG = 1024;
 
 export function HeaderProvider({ children }: { children: React.ReactNode }) {
-  const [pinned, setPinned] = useState(false);
-  const [contentReady, setContentReady] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const [contentReady, setContentReady] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).has("pdp");
+  });
   const lastY = useRef(0);
 
   useEffect(() => {
     const onScroll = () => {
       if (window.innerWidth >= LG) {
-        setPinned(false);
+        setHidden(false);
         return;
       }
       const y = window.scrollY;
       const scrollingUp = y < lastY.current;
-      setPinned(y > HEADER_H && scrollingUp);
+      setHidden(y > HEADER_H && !scrollingUp);
       lastY.current = y;
     };
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -64,7 +67,7 @@ export function HeaderProvider({ children }: { children: React.ReactNode }) {
   }, [contentReady]);
 
   return (
-    <HeaderContext value={pinned}>
+    <HeaderContext value={!hidden}>
       <LoadAnimationContext value={contentReady}>
         <SetContentReadyContext value={setContentReady}>
           {children}
@@ -95,7 +98,6 @@ export function BrowseHeader({
   mobileLogo: React.ReactNode;
   badges: React.ReactNode;
 }) {
-  const pinned = useHeaderPinned();
   const contentReady = useContext(LoadAnimationContext);
   const setContentReady = useContext(SetContentReadyContext);
   const [fadeProgress, setFadeProgress] = useState(0);
@@ -111,34 +113,18 @@ export function BrowseHeader({
 
   return (
     <>
-      {/* ── Mobile: in-flow header ── */}
-      <motion.nav
-        className="lg:hidden bg-white flex items-center justify-between px-[24px] py-6 z-30"
-        initial={{ opacity: 0 }}
-        animate={contentReady ? { opacity: 1 } : {}}
-        transition={{ duration: 0.4 }}
-      >
+      {/* ── Mobile: sticky header (hide on scroll-down, show on scroll-up) ── */}
+      <MobileStickyNav contentReady={contentReady}>
         {mobileLogo}
         {badges}
-      </motion.nav>
-
-      {/* ── Mobile: fixed header on scroll-up ── */}
-      <nav
-        className={`lg:hidden fixed top-0 left-0 right-0 z-40 bg-white flex items-center justify-between px-[24px] py-6 transition-transform duration-200 ${
-          pinned ? "translate-y-0" : "-translate-y-full pointer-events-none"
-        }`}
-        aria-hidden={!pinned}
-      >
-        {mobileLogo}
-        {badges}
-      </nav>
+      </MobileStickyNav>
 
       {/* ── Desktop: badges (not sticky) ── */}
       <motion.div
         className="hidden lg:block absolute top-[24px] right-[32px] z-50"
-        initial={{ opacity: 0, y: 8 }}
-        animate={contentReady ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.4, delay: 0.5 }}
+        initial={contentReady ? false : { opacity: 0, y: 8 }}
+        animate={contentReady ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+        transition={contentReady ? { duration: 0.4, delay: 0.15 } : { duration: 0 }}
       >
         {badges}
       </motion.div>
@@ -154,12 +140,12 @@ export function BrowseHeader({
         <div className="relative max-w-[640px]">
           {/* Layer 1: full text — word-by-word blur-in, then fades out on scroll */}
           <div style={{ opacity: 1 - fadeProgress }}>
-            <p className="text-[32px] font-serif font-medium leading-[1.25]">
+            <p className="text-[32px] font-serif font-normal leading-[1.25]">
               {SENTENCE_WORDS.map((word, i) => (
                 <motion.span
                   key={i}
                   className={i === 0 ? "italic" : undefined}
-                  initial={{ opacity: 0, filter: "blur(10px)" }}
+                  initial={contentReady ? false : { opacity: 0, filter: "blur(10px)" }}
                   animate={{ opacity: 1, filter: "blur(0px)" }}
                   transition={{
                     duration: WORD_DURATION,
@@ -179,10 +165,10 @@ export function BrowseHeader({
           </div>
           {/* Layer 2: "Almanac" only — always visible */}
           <motion.span
-            className="absolute top-0 left-0 text-[32px] font-serif font-medium italic leading-[1.25]"
-            initial={{ opacity: 0, filter: "blur(10px)" }}
+            className="absolute top-0 left-0 text-[32px] font-serif font-normal italic leading-[1.25]"
+            initial={contentReady ? false : { opacity: 0, filter: "blur(10px)" }}
             animate={{ opacity: 1, filter: "blur(0px)" }}
-            transition={{ duration: WORD_DURATION, ease: "easeOut" }}
+            transition={contentReady ? { duration: 0 } : { duration: WORD_DURATION, ease: "easeOut" }}
           >
             Almanac
           </motion.span>
@@ -192,15 +178,42 @@ export function BrowseHeader({
   );
 }
 
+/* ── Mobile sticky nav ── */
+
+function MobileStickyNav({
+  contentReady,
+  children,
+}: {
+  contentReady: boolean;
+  children: React.ReactNode;
+}) {
+  const pinned = useHeaderPinned();
+  const hidden = !pinned;
+
+  return (
+    <motion.nav
+      className="lg:hidden sticky top-0 z-40 bg-white flex items-center justify-between px-[16px] pt-[24px] pb-[12px] transition-transform duration-200"
+      style={{ transform: hidden ? "translateY(-100%)" : "translateY(0)" }}
+      initial={contentReady ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={contentReady ? { duration: 0 } : { duration: 0.4 }}
+    >
+      {children}
+    </motion.nav>
+  );
+}
+
 /* ── AnimatedContent wrapper for server-component page ── */
 
 export function AnimatedContent({ children }: { children: React.ReactNode }) {
   const ready = useContentReady();
+  const [wasReady] = useState(() => ready);
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={ready ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.4, delay: 0.5 }}
+      initial={wasReady ? false : { opacity: 0, y: 8 }}
+      animate={wasReady || ready ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+      transition={wasReady ? { duration: 0 } : { duration: 0.5, delay: 0.15 }}
     >
       {children}
     </motion.div>

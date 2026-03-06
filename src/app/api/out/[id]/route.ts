@@ -13,36 +13,36 @@ export async function GET(
   const normalizedId = id.trim();
 
   if (!normalizedId || normalizedId.length > 100) {
-    return new NextResponse("Invalid product ID format", { status: 400 });
+    return NextResponse.json({ error: "Invalid product ID format" }, { status: 400 });
   }
 
   // Step 2: Fetch product
   const supabase = supabaseServer();
   const { data: product, error } = await supabase
     .from("products")
-    .select("id,affiliate_url,product_url,merchant_id")
+    .select("id,affiliate_url,product_url,merchant_id,merchants(name)")
     .eq("id", normalizedId)
-    .maybeSingle<ClickoutProduct>();
+    .maybeSingle<ClickoutProduct & { merchants: { name: string } | null }>();
 
   if (error) {
     console.error("Database error fetching product:", error);
-    return new NextResponse("Internal server error", { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 
   if (!product) {
-    return new NextResponse("Product not found", { status: 404 });
+    return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
 
   // Step 3: Determine redirect URL
   const redirectUrl = product.affiliate_url || product.product_url;
 
   if (!redirectUrl) {
-    return new NextResponse("Product URL not available", { status: 404 });
+    return NextResponse.json({ error: "Product URL not available" }, { status: 404 });
   }
 
   // Validate URL scheme
   if (!redirectUrl.startsWith("http://") && !redirectUrl.startsWith("https://")) {
-    return new NextResponse("Invalid product URL", { status: 404 });
+    return NextResponse.json({ error: "Invalid product URL" }, { status: 404 });
   }
 
   // Step 4: Extract request metadata
@@ -69,8 +69,9 @@ export async function GET(
     console.error("Failed to track click event:", insertError);
   }
 
-  // Step 7: Return redirect
-  const response = NextResponse.redirect(redirectUrl, { status: 302 });
+  // Step 7: Return JSON with the redirect URL
+  const storeName = product.merchants?.name ?? null;
+  const response = NextResponse.json({ url: redirectUrl, storeName });
 
   if (sessionCookie) {
     response.cookies.set(

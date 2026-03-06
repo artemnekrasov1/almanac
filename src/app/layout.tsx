@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { EB_Garamond } from "next/font/google";
+import { Crimson_Pro } from "next/font/google";
 
-const ebGaramond = EB_Garamond({ subsets: ["latin"], style: ["normal", "italic"], variable: "--font-eb-garamond" });
+const crimsonPro = Crimson_Pro({ subsets: ["latin"], style: ["normal", "italic"], variable: "--font-crimson-pro" });
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,7 +22,7 @@ export default function RootLayout({
         <meta name="awin-verification" content="Awin" />
       </head>
       <body
-        className={`${GeistSans.variable} ${GeistMono.variable} ${ebGaramond.variable} antialiased`}
+        className={`${GeistSans.variable} ${GeistMono.variable} ${crimsonPro.variable} antialiased`}
       >
         {children}
       </body>

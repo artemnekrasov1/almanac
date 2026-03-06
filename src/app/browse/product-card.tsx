@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { useCurrency } from "./currency-context";
 
 export interface Product {
   id: string;
@@ -19,6 +20,24 @@ export interface Product {
   last_seen_at?: string | null;
 }
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  EUR: "€",
+  USD: "$",
+  GBP: "£",
+  JPY: "¥",
+  CHF: "CHF",
+  SEK: "kr",
+  NOK: "kr",
+  DKK: "kr",
+  PLN: "zł",
+  CZK: "Kč",
+};
+
+export function currencySymbol(code: string | null | undefined): string {
+  const key = (code ?? "EUR").toUpperCase();
+  return CURRENCY_SYMBOLS[key] ?? key;
+}
+
 export function getDiscountDotColor(percent: number): string | null {
   if (percent >= 65) return "#7D03B6";
   if (percent >= 55) return "#E53935";
@@ -32,6 +51,7 @@ export function getDiscountDotColor(percent: number): string | null {
 export function ProductCard({ p, onSelect }: { p: Product; onSelect?: (product: Product) => void }) {
   const imgRef = useRef<HTMLImageElement>(null);
   const [broken, setBroken] = useState(false);
+  const { currency, convertPrice } = useCurrency();
 
   if (broken || !p.image_url) return null;
 
@@ -50,7 +70,7 @@ export function ProductCard({ p, onSelect }: { p: Product; onSelect?: (product: 
           getDiscountDotColor(p.discount_percent) && (
             <Badge
               variant="discount"
-              className="discount-badge absolute bottom-[6px] left-[6px] font-serif font-medium"
+              className="discount-badge absolute bottom-[6px] left-[6px] font-serif font-normal"
             >
               <span
                 className="block shrink-0 w-[12px] h-[12px] rounded-full"
@@ -61,21 +81,21 @@ export function ProductCard({ p, onSelect }: { p: Product; onSelect?: (product: 
           )}
       </div>
 
-      <div className="mt-[8px] pr-[16px] font-serif font-medium">
-        <div className="text-[13px] text-black italic">{p.brand ?? "—"}</div>
-        <div className="text-[13px] text-black/40">{p.title}</div>
+      <div className="mt-[8px] pr-[16px] font-serif font-normal">
+        <div className="text-[14px] text-black italic">{p.brand ?? "—"}</div>
+        <div className="text-[14px] text-black/40">{p.title}</div>
         {p.sizes_raw && (
-          <div className="text-[13px] text-black/40">
+          <div className="text-[14px] text-black/40">
             {p.sizes_raw}
           </div>
         )}
         <div className="flex items-baseline">
-          <span className="text-[13px] text-black">
-            {p.price_sale ?? "—"} {p.currency ?? "EUR"}
+          <span className="text-[14px] text-black">
+            {convertPrice(p.price_sale, p.currency) ?? "—"} {currencySymbol(currency)}
           </span>
           {p.price_original != null && p.price_original !== p.price_sale && (
-            <span className="text-[13px] text-black/40 line-through ml-[8px]">
-              {p.price_original} {p.currency ?? "EUR"}
+            <span className="text-[14px] text-black/40 line-through ml-[8px]">
+              {convertPrice(p.price_original, p.currency)} {currencySymbol(currency)}
             </span>
           )}
         </div>

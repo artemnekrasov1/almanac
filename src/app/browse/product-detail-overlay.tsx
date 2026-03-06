@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
-import { getDiscountDotColor, type Product } from "./product-card";
+import { Button } from "@/components/ui/button";
+import { currencySymbol, getDiscountDotColor, type Product } from "./product-card";
+import { useCurrency } from "./currency-context";
+import { useFavorites } from "./favorites-context";
 
 interface Props {
   product: Product;
@@ -27,6 +30,8 @@ function FadeImage({ src, alt, className }: { src?: string; alt?: string; classN
 }
 
 export function ProductDetailOverlay({ product, onClose }: Props) {
+  const { currency, convertPrice } = useCurrency();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [images, setImages] = useState<string[]>(
     product.image_url ? [product.image_url] : []
   );
@@ -71,7 +76,7 @@ export function ProductDetailOverlay({ product, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center"
+      className="fixed inset-0 z-50 flex items-start justify-center font-sans"
       style={{
         background: "rgba(246, 246, 243, 0.9)",
         backdropFilter: "blur(20px)",
@@ -111,33 +116,13 @@ export function ProductDetailOverlay({ product, onClose }: Props) {
             }}
           >
             <div className="w-full">
-              <div className="font-serif italic text-[32px] font-medium leading-tight">
+              <div className="font-serif italic text-[22px] font-normal leading-tight">
                 {product.brand ?? "—"}
               </div>
-              <div className="font-serif text-[17px] text-black/40 mt-[2px]">
+              <div className="font-serif text-[17px] text-black/40 mt-[0px]">
                 {product.title}
               </div>
-              {product.sizes_raw && (
-                <div className="mt-[40px] flex flex-col gap-[8px]">
-                  <div className="font-sans font-medium text-[11px] uppercase text-black/40 tracking-wide">
-                    Available sizes
-                  </div>
-                  <div className="font-serif font-medium text-[13px]">
-                    {product.sizes_raw}
-                  </div>
-                </div>
-              )}
-              {product.description && (
-                <div className="mt-[40px] flex flex-col gap-[8px]">
-                  <div className="font-sans font-medium text-[11px] uppercase text-black/40 tracking-wide">
-                    Description
-                  </div>
-                  <div className="font-serif font-medium text-[13px]">
-                    {product.description}
-                  </div>
-                </div>
-              )}
-              <div className="mt-[40px]">
+              <div className="mt-[32px]">
                 {typeof product.discount_percent === "number" &&
                   getDiscountDotColor(product.discount_percent) && (
                     <div className="flex items-center gap-[8px]">
@@ -145,35 +130,67 @@ export function ProductDetailOverlay({ product, onClose }: Props) {
                         className="block w-[12px] h-[12px] rounded-full shrink-0"
                         style={{ backgroundColor: getDiscountDotColor(product.discount_percent)! }}
                       />
-                      <span className="font-serif font-medium text-[13px]">
+                      <span className="font-serif font-normal text-[14px]">
                         -{product.discount_percent}%
                       </span>
                     </div>
                   )}
-                <div className="flex items-baseline mt-[4px]">
-                  <span className="font-serif font-medium text-[17px]">
-                    {product.price_sale ?? "—"} {product.currency ?? "EUR"}
+                <div className="flex items-baseline mt-[0px]">
+                  <span className="font-serif font-normal text-[17px]">
+                    {convertPrice(product.price_sale, product.currency) ?? "—"} {currencySymbol(currency)}
                   </span>
                   {product.price_original != null && product.price_original !== product.price_sale && (
-                    <span className="font-serif font-medium text-[17px] text-black/40 line-through ml-[8px]">
-                      {product.price_original} {product.currency ?? "EUR"}
+                    <span className="font-serif font-normal text-[17px] text-black/40 line-through ml-[8px]">
+                      {convertPrice(product.price_original, product.currency)} {currencySymbol(currency)}
                     </span>
                   )}
                 </div>
               </div>
-              <div className="mt-[16px] flex gap-[8px]">
-                <a
-                  href={`/out/${product.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 flex items-center h-[40px] px-[16px] bg-black rounded-full font-sans font-medium text-[12px] uppercase text-white"
+              {product.sizes_raw && (
+                <div className="mt-[32px] flex flex-col gap-[4px]">
+                  <div className="font-sans font-medium text-[11px] uppercase text-black/40 tracking-wide">
+                    Available sizes
+                  </div>
+                  <div className="font-serif font-normal text-[14px]">
+                    {product.sizes_raw}
+                  </div>
+                </div>
+              )}
+              <div className="mt-[24px] flex gap-[8px]">
+                <Button variant="pill-primary" asChild className="flex-1">
+                  <a
+                    href={`/out/${product.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Buy on {product.merchant_name ?? "Store"}
+                  </a>
+                </Button>
+                <Button
+                  className="relative"
+                  variant="pill-secondary"
+                  onClick={() => toggleFavorite(product.id)}
                 >
-                  Buy on {product.merchant_name ?? "Store"}
-                </a>
-                <button className="flex items-center justify-center h-[40px] px-[16px] bg-[#F6F6F3] rounded-full font-sans font-medium text-[12px] uppercase text-black">
-                  Add to favorites
-                </button>
+                  <span className="invisible">Add to Favorites</span>
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.span
+                      key={isFavorite(product.id) ? "in" : "add"}
+                      className="absolute inset-0 flex items-center justify-center"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                    >
+                      {isFavorite(product.id) ? "In Favorites" : "Add to Favorites"}
+                    </motion.span>
+                  </AnimatePresence>
+                </Button>
               </div>
+              {product.description && (
+                <div className="mt-[32px] font-serif font-normal text-[14px]">
+                  {product.description}
+                </div>
+              )}
             </div>
           </div>
 
@@ -195,7 +212,7 @@ export function ProductDetailOverlay({ product, onClose }: Props) {
 
       {/* Mobile layout */}
       <motion.div
-        className="flex lg:hidden flex-col w-full h-full overflow-y-auto bg-white"
+        className="lg:hidden w-full h-full overflow-y-auto bg-white"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
@@ -211,46 +228,26 @@ export function ProductDetailOverlay({ product, onClose }: Props) {
         </div>
 
         {/* Horizontal image scroll */}
-        <div className="flex overflow-x-auto gap-[2px]">
+        <div className="flex overflow-x-auto gap-[2px] items-start">
           {images.map((src, i) => (
             <FadeImage
               key={src}
               src={src}
               alt={`${product.title ?? "Product"} ${i + 1}`}
-              className="max-w-[80vw] h-auto shrink-0"
+              className="w-[80vw] shrink-0"
             />
           ))}
         </div>
 
         {/* Product info */}
-        <div className="p-[24px]">
-          <div className="font-serif italic text-[32px] font-medium leading-tight">
+        <div className="p-[16px]">
+          <div className="font-serif italic text-[22px] font-normal leading-tight">
             {product.brand ?? "—"}
           </div>
-          <div className="font-serif text-[17px] text-black/40 mt-[2px]">
+          <div className="font-serif text-[17px] text-black/40 mt-[0px]">
             {product.title}
           </div>
-          {product.sizes_raw && (
-            <div className="mt-[40px] flex flex-col gap-[8px]">
-              <div className="font-sans font-medium text-[11px] uppercase text-black/40 tracking-wide">
-                Available sizes
-              </div>
-              <div className="font-serif font-medium text-[13px]">
-                {product.sizes_raw}
-              </div>
-            </div>
-          )}
-          {product.description && (
-            <div className="mt-[40px] flex flex-col gap-[8px]">
-              <div className="font-sans font-medium text-[11px] uppercase text-black/40 tracking-wide">
-                Description
-              </div>
-              <div className="font-serif font-medium text-[13px]">
-                {product.description}
-              </div>
-            </div>
-          )}
-          <div className="mt-[40px]">
+          <div className="mt-[32px]">
             {typeof product.discount_percent === "number" &&
               getDiscountDotColor(product.discount_percent) && (
                 <div className="flex items-center gap-[8px]">
@@ -258,37 +255,63 @@ export function ProductDetailOverlay({ product, onClose }: Props) {
                     className="block w-[12px] h-[12px] rounded-full shrink-0"
                     style={{ backgroundColor: getDiscountDotColor(product.discount_percent)! }}
                   />
-                  <span className="font-serif font-medium text-[13px]">
+                  <span className="font-serif font-normal text-[14px]">
                     -{product.discount_percent}%
                   </span>
                 </div>
               )}
-            <div className="flex items-baseline mt-[4px]">
-              <span className="font-serif font-medium text-[17px]">
-                {product.price_sale ?? "—"} {product.currency ?? "EUR"}
+            <div className="flex items-baseline mt-[0px]">
+              <span className="font-serif font-normal text-[17px]">
+                {convertPrice(product.price_sale, product.currency) ?? "—"} {currencySymbol(currency)}
               </span>
               {product.price_original != null && product.price_original !== product.price_sale && (
-                <span className="font-serif font-medium text-[17px] text-black/40 line-through ml-[8px]">
-                  {product.price_original} {product.currency ?? "EUR"}
+                <span className="font-serif font-normal text-[17px] text-black/40 line-through ml-[8px]">
+                  {convertPrice(product.price_original, product.currency)} {currencySymbol(currency)}
                 </span>
               )}
             </div>
           </div>
-          <div className="mt-[16px] flex gap-[8px]">
-            <a
-              href={`/out/${product.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 flex items-center h-[40px] px-[16px] bg-black rounded-full font-sans font-medium text-[12px] uppercase text-white"
+          {product.sizes_raw && (
+            <div className="mt-[32px] flex flex-col gap-[4px]">
+              <div className="font-sans font-medium text-[11px] uppercase text-black/40 tracking-wide">
+                Available sizes
+              </div>
+              <div className="font-serif font-normal text-[14px]">
+                {product.sizes_raw}
+              </div>
+            </div>
+          )}
+          <div className="mt-[32px]">
+            <Button
+              variant={isFavorite(product.id) ? "pill-primary" : "pill-secondary"}
+              onClick={() => toggleFavorite(product.id)}
             >
-              Buy on {product.merchant_name ?? "Store"}
-            </a>
-            <button className="flex items-center justify-center h-[40px] px-[16px] bg-[#F6F6F3] rounded-full font-sans font-medium text-[12px] uppercase text-black">
-              Add to favorites
-            </button>
+              <span className="invisible">Added to favorites</span>
+              <span className="absolute inset-0 flex items-center justify-center">
+                {isFavorite(product.id) ? "Added to favorites" : "Add to favorites"}
+              </span>
+            </Button>
           </div>
+          {product.description && (
+            <div className="mt-[32px] font-serif font-normal text-[14px]">
+              {product.description}
+            </div>
+          )}
+          {/* Spacer for sticky buttons */}
+          <div className="h-[80px]" />
         </div>
       </motion.div>
+      <div className="fixed bottom-0 left-0 right-0 z-10 flex flex-col gap-[8px] px-[16px] py-[16px] bg-white lg:hidden">
+        <Button variant="pill-primary" asChild>
+          <a
+            href={`/out/${product.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Buy on {product.merchant_name ?? "Store"}
+          </a>
+        </Button>
+      </div>
     </div>
   );
 }

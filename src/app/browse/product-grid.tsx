@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ProductCard } from "./product-card";
 import { ProductDetailOverlay } from "./product-detail-overlay";
 import { useFilters } from "./filter-context";
+import { Button } from "@/components/ui/button";
 import type { Product } from "./product-card";
 
 interface Props {
@@ -47,7 +48,10 @@ export function ProductGrid({ initialProducts, initialNextCursor }: Props) {
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [loading, setLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showLoadMore, setShowLoadMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const autoLoadCount = useRef(0);
+  const loadingRef = useRef(false);
 
   // Stable string key for filter deps
   const filterKey = useMemo(
@@ -121,6 +125,9 @@ export function ProductGrid({ initialProducts, initialNextCursor }: Props) {
     setLoading(true);
     setProducts([]);
     setNextCursor(null);
+    autoLoadCount.current = 0;
+    loadingRef.current = false;
+    setShowLoadMore(false);
 
     const qs = filterKey ? `?${filterKey}` : "";
     fetch(`/api/browse${qs}`)
@@ -139,7 +146,8 @@ export function ProductGrid({ initialProducts, initialNextCursor }: Props) {
   }, [filterKey]);
 
   const fetchMore = useCallback(async () => {
-    if (!nextCursor || loading) return;
+    if (!nextCursor || loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     const filterQs = filterKey ? `&${filterKey}` : "";
     try {
@@ -154,10 +162,19 @@ export function ProductGrid({ initialProducts, initialNextCursor }: Props) {
         return [...prev, ...fresh];
       });
       setNextCursor(data.nextCursor);
+      autoLoadCount.current += 1;
+      if (autoLoadCount.current >= 1) {
+        setShowLoadMore(true);
+      }
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
-  }, [nextCursor, loading, filterKey]);
+  }, [nextCursor, filterKey]);
+
+  // Keep a stable ref to fetchMore so the observer doesn't re-create on every render
+  const fetchMoreRef = useRef(fetchMore);
+  fetchMoreRef.current = fetchMore;
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -165,8 +182,8 @@ export function ProductGrid({ initialProducts, initialNextCursor }: Props) {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          fetchMore();
+        if (entries[0].isIntersecting && autoLoadCount.current < 1) {
+          fetchMoreRef.current();
         }
       },
       { rootMargin: "200px" }
@@ -174,23 +191,37 @@ export function ProductGrid({ initialProducts, initialNextCursor }: Props) {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [fetchMore]);
+    // Only re-create when the sentinel element changes (showLoadMore toggles it)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showLoadMore]);
 
   return (
     <>
       <div
         key={gridEpoch}
-        className={`mt-[32px] lg:mt-[64px] grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 3xl:grid-cols-5 gap-[24px] lg:gap-[32px] items-start font-sans font-medium ${gridEpoch > 0 ? "animate-grid-fade-in" : ""}`}
+        className={`mt-[16px] lg:mt-[64px] grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-[16px] lg:gap-[32px] items-start font-sans font-medium ${gridEpoch > 0 ? "animate-grid-fade-in" : ""}`}
       >
         {products.map((p) => (
           <ProductCard key={p.id} p={p} onSelect={selectProduct} />
         ))}
       </div>
 
-      {nextCursor && (
+      {nextCursor && !showLoadMore && (
         <div ref={sentinelRef} className="mt-6 flex justify-center py-4">
           {loading && (
             <span className="text-sm text-black/40">Loading...</span>
+          )}
+        </div>
+      )}
+
+      {nextCursor && showLoadMore && (
+        <div className="mt-6 flex justify-center py-4">
+          {loading ? (
+            <span className="text-sm text-black/40">Loading...</span>
+          ) : (
+            <Button variant="pill-secondary" onClick={fetchMore}>
+              Load More
+            </Button>
           )}
         </div>
       )}
