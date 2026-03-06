@@ -7,7 +7,7 @@ const crimsonPro = Crimson_Pro({ subsets: ["latin"], style: ["normal", "italic"]
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ALMANAC",
+  title: "Almanac",
   description: "Curated + Discounted Archive Fashion",
 };
 
