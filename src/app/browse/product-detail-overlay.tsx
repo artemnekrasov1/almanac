@@ -283,6 +283,7 @@ export function ProductDetailOverlay({ product, onClose }: Props) {
           )}
           <div className="mt-[32px]">
             <Button
+              className="relative"
               variant={isFavorite(product.id) ? "pill-primary" : "pill-secondary"}
               onClick={() => toggleFavorite(product.id)}
             >
